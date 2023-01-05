@@ -18,63 +18,23 @@ n=$SLURM_ARRAY_TASK_ID
 
 #maestro
 
-n=cqtdiff+_MAESTRO #original CQTDiff (with fast implementation) (22kHz)
-#n=49 #dance diffusion (16 kHz)
-#n=44 #cqtdiff+ no attention maestro 8s
-#n=45 #cqtdiff+ attention maestro 8s
-#n=50 #cqtdiff+ attention maestro 8s (alt version)
+#n=cqtdiff+_MAESTRO #trained on maestro fs=22.05 kHz, audio_len=8s
+n=cqtdiff+_MUSICNET #trained on musixnet fs=44.1kHz, audio_len=4s
 
-#n=54 #cqtdiff+ maestro 8s (alt version)
-#n=50 #cqtdiff+ attention maestro 8s (alt version)
-
-#n=56 #ADP
-
-#n=51 #musicnet
-
-if [[ $n -eq 54 ]] 
+if [[ $n -eq CQTdiff+_MUSICNET ]] 
 then
-    ckpt="/scratch/work/molinee2/projects/ddpm/diffusion_autumn_2022/A-diffusion/experiments/54/22k_8s-850000.pt"
-    exp=maestro22k_8s
-    network=paper_1912_unet_cqt_oct_noattention_adaln
-    tester=inpainting_tester
+    ckpt="/scratch/work/molinee2/projects/ddpm/audio-inpainting-diffusion/experiments/cqtdiff+_MUSICNET/musicnet_44k_4s_560000.pt"
+    exp=musicnet44k_4s
+    network=paper_1912_unet_cqt_oct_attention_44k_2
     dset=maestro_allyears
-    CQT=True
-elif [[ $n -eq 3 ]] 
-then
-    ckpt="/scratch/work/molinee2/projects/ddpm/diffusion_autumn_2022/A-diffusion/experiments/3/weights-489999.pt"
-    exp=test_cqtdiff_22k
-    network=unet_cqtdiff_original
     tester=inpainting_tester
-    dset=maestro_allyears
-    CQT=False
-
-elif [[ $n -eq 56 ]] 
-then
-    ckpt="/scratch/work/molinee2/projects/ddpm/diffusion_autumn_2022/A-diffusion/experiments/56/22k_8s-510000.pt"
-    exp=maestro22k_131072
-    network=ADP_raw_patching
-    tester=inpainting_tester
-    dset=maestro_allyears
-    CQT=False
 elif [[ $n -eq CQTdiff+_MAESTRO ]] 
 then
-    ckpt="/scratch/work/molinee2/projects/ddpm/audio-inpainting-diffusion/experiments/cqtdiff+_MAESTRO/22k_8s-750000.pt"
+    ckpt="/scratch/work/molinee2/projects/ddpm/audio-inpainting-diffusion/experiments/cqtdiff+_MAESTRO/maestro_22k_8s-750000.pt"
     exp=maestro22k_8s
     network=paper_1912_unet_cqt_oct_attention_adaLN_2
     dset=maestro_allyears
     tester=inpainting_tester
-    CQT=True
-
-elif [[ $n -eq 51 ]] 
-then
-    ckpt="/scratch/work/molinee2/projects/ddpm/diffusion_autumn_2022/A-diffusion/experiments/51/44k_4s-560000.pt"
-    exp=musicnet44k_4s
-    network=paper_1912_unet_cqt_oct_attention_44k_2
-    dset=inpainting_musicnet_50
-    #dset=inpainting_musicnet
-    tester=inpainting_tester_shortgaps
-    CQT=True
-fi
 
 
 PATH_EXPERIMENT=experiments/$n
@@ -89,5 +49,4 @@ python test.py model_dir="$PATH_EXPERIMENT" \
                network=$network \
                tester=$tester \
                tester.checkpoint=$ckpt \
-              tester.filter_out_cqt_DC_Nyq=$CQT
                 

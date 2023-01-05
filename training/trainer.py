@@ -1,23 +1,13 @@
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-# This work is licensed under a Creative Commons
-# Attribution-NonCommercial-ShareAlike 4.0 International License.
-# You should have received a copy of the license along with this
-# work. If not, see http://creativecommons.org/licenses/by-nc-sa/4.0/
-
 """Main training loop."""
 
 import os
 import time
 import copy
-#import json
-#import pickle
-#import psutil
+
 import numpy as np
 import torch
 import torchaudio
-#import utils.dnnlib
-#from utils.torch_utils import distributed as dist
+
 from utils.torch_utils import training_stats
 from utils.torch_utils import misc
 
@@ -34,7 +24,6 @@ import omegaconf
 
 import utils.training_utils as t_utils
 
-from surgeon_pytorch import Inspect, get_layers
 #----------------------------------------------------------------------------
 class Trainer():
     def __init__(self, args, dset, network, optimizer, diff_params, tester=None, device='cpu'):
@@ -62,26 +51,8 @@ class Trainer():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.deterministic = False
 
-        #torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
-
-        #S=self.args.exp.resample_factor
-        #if S>2.1 and S<2.2:
-        #    #resampling 48k to 22.05k
-        #    self.resample=torchaudio.transforms.Resample(160*2,147).to(self.device)
-        #elif S!=1:
-        #    N=int(self.args.exp.audio_len*S)
-        #    self.resample=torchaudio.transforms.Resample(N,self.args.exp.audio_len).to(self.device)
-
-        # Setup augmentation.
-        #augment_pipe = dnnlib.util.construct_class_by_name(**augment_kwargs) if augment_kwargs is not None else None # training.augment.AugmentPipe
-
-        #print model summary
-
         self.total_params = sum(p.numel() for p in self.network.parameters() if p.requires_grad)
         print("total_params: ",self.total_params/1e6, "M")
-
-        self.layer_list=get_layers(self.network) #used for logging feature statistics
-        self.network_wrapped=Inspect(self.network, self.layer_list) #used for logging feature statistics
 
         self.ema = copy.deepcopy(self.network).eval().requires_grad_(False)
         
@@ -140,8 +111,6 @@ class Trainer():
                 self.profile=False
                 
 
-            
-
     def setup_wandb(self):
         """
         Configure wandb, open a new run and log the configuration.
@@ -168,44 +137,6 @@ class Trainer():
     def load_state_dict(self, state_dict):
         #print(state_dict)
         return t_utils.load_state_dict(state_dict, network=self.network, ema=self.ema, optimizer=self.optimizer)
-
-    def load_state_dict_legacy(self, state_dict):
-        #print(state_dict)
-        print(state_dict.keys())
-        try:
-            self.it = state_dict['it']
-        except:
-            self.it=150000 #large number to mean that we loaded somethin, but it is arbitrary
-        try:
-            self.network.load_state_dict(state_dict['network'])
-            self.optimizer.load_state_dict(state_dict['optimizer'])
-            self.ema.load_state_dict(state_dict['ema'])
-            return True
-        except Exception as e:
-            print("Could not load state dict")
-            print(e)
-            print("trying with strict=False")
-        try:
-            self.network.load_state_dict(state_dict['network'], strict=False)
-            #we cannot load the optimizer in this setting
-            #self.optimizer.load_state_dict(state_dict['optimizer'], strict=False)
-            self.ema.load_state_dict(state_dict['ema'], strict=False)
-            return True
-        except Exception as e:
-            print("Could not load state dict")
-            print(e)
-            print("training from scratch")
-
-        try:
-            self.network.load_state_dict(state_dict['state_dict'])
-            self.ema.load_state_dict(state_dict['state_dict'])
-        except Exception as e:
-            print("Could not load state dict")
-            print(e)
-            print("training from scratch")
-            print("It failed 3 times!! giving up..")
-            return False
-            
 
 
     def resume_from_checkpoint(self, checkpoint_path=None, checkpoint_id=None):
@@ -279,23 +210,6 @@ class Trainer():
         self.latest_checkpoint=save_name
 
 
-    def log_feature_stats(self):
-        print("logging feature stats")
-        #this is specific for the edm diff_params, be careful if changing it
-        x=self.get_batch()
-        sigma=self.diff_params.sample_ptrain_safe(x.shape[0]).unsqueeze(-1).to(x.device)
-
-        input, target, cnoise= self.diff_params.prepare_train_preconditioning(x, sigma)
-        estimate, feat_list=self.network_wrapped(input,cnoise) #is this too crazy memory wise?
-        
-        for name, a in zip(self.layer_list, feat_list):
-            #log an histogram for each layer in wandb
-            if a is not None:
-                
-                wandb.log({f"features/{name}": wandb.Histogram(a[0].detach().cpu().numpy())}, step=self.it)
-
-        del feat_list #I hope this frees the memory
-
     def process_loss_for_logging(self, error: torch.Tensor, sigma: torch.Tensor):
         """
         This function is used to process the loss for logging. It is used to group the losses by the values of sigma and report them using training_stats.
@@ -306,20 +220,6 @@ class Trainer():
         #sigma values are ranged between self.args.diff_params.sigma_min and self.args.diff_params.sigma_max. We need to quantize the values of sigma into 10 logarithmically spaced bins between self.args.diff_params.sigma_min and self.args.diff_params.sigma_max
         torch.nan_to_num(error) #not tested might crash
         error=error.detach().cpu().numpy()
-
-        #Now I need to report the error respect to frequency. I would like to do this by using the CQT of the error and then report the error respect to both sigma and frequency
-        #I will use librosa to compute the CQT
-
-        #will this be too heavy? I am not sure. I will try it and see what happens
-        if self.it%self.args.logging.freq_cqt_logging==0: #do that only once every 50 iterations, for efficiency
-            cqt_res=[]
-            for i in range(error.shape[0]):
-                #running this cqt in gpu would be faster. 
-                cqt = librosa.cqt(error[i], sr=self.args.exp.sample_rate, hop_length=self.args.logging.cqt.hop_length, fmin=self.args.logging.cqt.fmin, n_bins=self.args.logging.cqt.num_octs*self.args.logging.cqt.bins_per_oct, bins_per_octave=self.args.logging.cqt.bins_per_oct)
-                cqt_res.append(np.abs(cqt.mean(axis=1)))
-                #now I need to report the error respect to frequency
-        else:
-            cqt_res=None
 
         for i in range(len(self.sigma_bins)):
             if i == 0:
@@ -336,32 +236,22 @@ class Trainer():
 
                 training_stats.report('error_sigma_'+str(self.sigma_bins[i]),error[idx].mean())
 
-                if cqt_res is not None:
-                    for j in range(cqt.shape[0]):
-                        training_stats.report('error_sigma_'+str(self.sigma_bins[i])+'_freq_'+str(self.freq_bins[j]),cqt_res[idx][j].mean())
-
-        if cqt_res is not None:
-            for j in range(cqt.shape[0]):
-                for i in range(len(cqt_res)):
-                    training_stats.report('error_freq_'+str(self.freq_bins[j]),cqt_res[i][j].mean())
     def get_batch(self):
         #load the data batch
         if self.args.dset.name == "maestro_allyears":
+            #this dataset has data sampled at different frequencies, so we need to resample it. The dataset returns a tuple (audio, fs), where fs is the sampling frequency of the given audio sample. Moreover, the size of the audio tensor is [B, dset.load_len], where dset.load_len is an arbitrary number designed to be sufficiently large so that the 48kHz audio samples can be loaded without any problem. We need to resample the audio tensor to the desired sampling frequency, and then crop it to the desired length.
+
             audio, fs = next(self.dset)
             audio=audio.to(self.device).to(torch.float32)
-            print(fs, audio.shape)
-            #do resampling if needed
-            #print("before resample",audio.shape, self.args.exp.resample_factor)
+
             return t_utils.resample_batch(audio, fs, self.args.exp.sample_rate, self.args.exp.audio_len)
         else: 
             audio = next(self.dset)
             audio=audio.to(self.device).to(torch.float32)
             #do resampling if needed
-            #print("before resample",audio.shape, self.args.exp.resample_factor)
             if self.args.exp.resample_factor != 1:
-                #self.resample(audio)
                 audio=torchaudio.functional.resample(audio, self.args.exp.resample_factor, 1)
-            #TODO: add augmentation
+
             return audio
     def train_step(self):
         # Train step
@@ -379,8 +269,6 @@ class Trainer():
             loss.backward() #TODO: take care of the loss scaling if using mixed precision
             #do I want to call this at every round? It will slow down the training. I will try it and see what happens
 
-            #loss.sum().mul(self.args.exp.loss_scaling).backward()
-            #print(loss.item())
 
 
         if self.it <= self.args.exp.lr_rampup_it:
@@ -388,10 +276,6 @@ class Trainer():
                 #learning rate ramp up
                 g['lr'] = self.args.exp.lr * min(self.it / max(self.args.exp.lr_rampup_it, 1e-8), 1)
 
-        #for param in self.network.parameters():
-        #    #take care of none gradients. Is that needed? 
-        #    if param.grad is not None:
-        #        torch.nan_to_num(param.grad, nan=0, posinf=1e5, neginf=-1e5, out=param.grad)#This is needed for the loss scaling. That is what causes the nan gradients. 
 
         if self.args.exp.use_grad_clip:
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), self.args.exp.max_grad_norm)
@@ -454,44 +338,10 @@ class Trainer():
         wandb.log({"loss_dependent_on_sigma": figure}, step=self.it, commit=True)
 
 
-        #TODO log here the losses at different noise levels. I don't know if these should be heavy
-        #TODO also log here the losses at different frequencies if we are reporting them. same as above
-
     def heavy_logging(self):
         """
         Do the heavy logging here. This will be called every 10000 iterations or so
         """
-        freq_means=[]
-        freq_stds=[]
-        freq_sigma_means=[]
-        freq_sigma_stds=[]
-        for j in range(len(self.freq_bins)):
-            a=training_stats.default_collector.mean('error_freq_'+str(self.freq_bins[j]))
-            freq_means.append(a)
-            self.wandb_run.log({'error_freq_'+str(self.freq_bins[j]):a}, step=self.it)
-
-            a=training_stats.default_collector.std('error_freq_'+str(self.freq_bins[j]))
-            freq_stds.append(a)
-            #I need to take care of this in some other way that is easier to visualize
-            omeans=[]
-            ostds=[]
-            for i in range(len(self.sigma_bins)):
-                a=training_stats.default_collector.mean('error_sigma_'+str(self.sigma_bins[i])+'_freq_'+str(self.freq_bins[j]))
-                omeans.append(a)
-                a=training_stats.default_collector.std('error_sigma_'+str(self.sigma_bins[i])+'_freq_'+str(self.freq_bins[j]))
-                ostds.append(a)
-                #wandb.log({'error_sigma_'+str(self.sigma_bins[i])+'_freq_'+str(self.freq_bins[j]):a}, step=self.it)
-                #this logging will not be so handy. I create a figure using plotly to nicely visualize the results
-            freq_sigma_means.append(omeans)
-            freq_sigma_stds.append(ostds)
-
-        figure=utils_logging.plot_loss_by_sigma(freq_means,freq_stds, self.freq_bins)
-        wandb.log({"loss_dependent_on_freq": figure}, step=self.it)
-
-
-        figure=utils_logging.plot_loss_by_sigma_and_freq(freq_sigma_means,freq_sigma_stds, self.sigma_bins, self.freq_bins)#TODO!!!
-        wandb.log({"loss_dependent_on_freq_and_sigma": figure}, step=self.it)
-
         if self.do_test:
 
             if self.latest_checkpoint is not None:
@@ -499,10 +349,7 @@ class Trainer():
 
             preds=self.tester.sample_unconditional()
             preds=self.tester.test_inpainting()
-            preds=self.tester.test_bwe()
-            #self.log_audio(preds, "unconditional_sampling")
 
-        #TODO: call the unconditional generation function and log the audio samples
     def log_audio(self,x, name):
         string=name+"_"+self.args.tester.name
         audio_path=utils_logging.write_audio_file(x,self.args.exp.sample_rate, string,path=self.args.model_dir)
@@ -510,13 +357,6 @@ class Trainer():
         #TODO: log spectrogram of the audio file to wandb
         spec_sample=utils_logging.plot_spectrogram_from_raw_audio(x, self.args.logging.stft)
         self.wandb_run.log({"spec_"+str(string): spec_sample}, step=self.it)
-
-    def conditional_demos(self):
-        """
-        Do the conditional demos here. This will be called every 10000 iterations or so
-        """
-        #TODO: call the conditional generation function and log the audio samples
-        pass
 
 
     def training_loop(self):
@@ -551,8 +391,6 @@ class Trainer():
                 #self.save_snapshot() #are the snapshots necessary? I think they are not.
                 self.save_checkpoint()
 
-            if self.it>0 and self.it%self.args.logging.log_feature_stats_interval==0 and self.args.logging.log_feature_stats:
-                self.log_feature_stats()
 
             if self.it>0 and self.it%self.args.logging.heavy_log_interval==0 and self.args.logging.log:
                 self.heavy_logging()
@@ -561,8 +399,6 @@ class Trainer():
             if self.it>0 and self.it%self.args.logging.log_interval==0 and self.args.logging.log:
                 self.easy_logging()
 
-
-            
 
             # Update state.
             self.it += 1
