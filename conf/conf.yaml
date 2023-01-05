@@ -1,10 +1,10 @@
 defaults:
-  - dset: maestro_little
-  - network: unet_cqtdiff
+  - dset: maestro_allyears
+  - network: paper_1912_unet_cqt_oct_attention_adaLN_2
   - diff_params: edm
-  - tester: edm_2ndorder_stochastic
-  - exp: test_cqtdiff_matrix_22k
-  - logging: base_logging
+  - tester: inpainting_tester
+  - exp: maestro22k_8s 
+  - logging: huge_model_logging
 
 model_dir: "experiments/cqt"
 

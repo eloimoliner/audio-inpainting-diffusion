@@ -21,6 +21,7 @@ from tqdm import tqdm
 import utils.training_utils as t_utils
 import omegaconf
 import numpy as np
+import cv2
 
 '''
 In this tester I will test:
@@ -292,26 +293,7 @@ class Tester():
         print("rectangular spectral mask with shape ", A.shape," created. The time indexes are :", start_gap_index, end_gap_index, "and the frequency indexes are :", fmin_idx, fmax_idx)
         return A
 
-    def prepare_STN_mask(self,x):
-        #prepare the mask for the spectral inpainting
-        #The mask is defined in the stft domain
 
-        from utils.decSTN_pytorch import STN_masker
-        nwin1=self.args.tester.STN_inpainting.STN_params.nwin1
-        G1=self.args.tester.STN_inpainting.STN_params.G1
-        G2=self.args.tester.STN_inpainting.STN_params.G2
-        masker=STN_masker(self.args.exp.sample_rate,nwin1, G1, G2,device=x.device)
-        S,T,N=masker.get_masks(x)
-        if self.args.tester.STN_inpainting.type=="S":
-            return S
-        elif self.args.tester.STN_inpainting.type=="T":
-            return T
-        elif self.args.tester.STN_inpainting.type=="N":
-            return N
-        elif self.args.tester.STN_inpainting.type=="TN":
-            return T+N
-        else:
-            raise NotImplementedError("Only S, T and N masks are implemented for now")
 
 
     def apply_spectral_mask(self,x,mask):
@@ -339,6 +321,27 @@ class Tester():
         print(x_masked.shape, input_shape)
 
         return x_masked
+
+    def get_spectrogram_image(self, x):
+
+        if self.args.tester.spectrogram_inpainting.stft.window=="hann":
+            window=torch.hann_window(self.args.tester.spectrogram_inpainting.stft.win_length).to(x.device)
+        else:
+            raise NotImplementedError("Only hann window is implemented for now")
+
+        n_fft=self.args.tester.spectrogram_inpainting.stft.n_fft
+        #add padding to the signal
+        input_shape=x.shape
+        x=torch.nn.functional.pad(x, (0, n_fft-x.shape[-1]%n_fft), mode='constant', value=0)
+        X=torch.stft(x, n_fft, self.args.tester.spectrogram_inpainting.stft.hop_length, self.args.tester.spectrogram_inpainting.stft.win_length, window, return_complex=True) 
+        X=X.abs()
+        #in db
+        X=20*torch.log10(X+1e-6)
+        X=X.detach().cpu().numpy()
+        X=X[0]
+        #normalize spectrogram
+        return X
+
 
 
 
@@ -488,38 +491,21 @@ class Tester():
             self.log_audio(res, "spectrogram_inpainting")
         
         #TODO save the files in the subdirectory inpainting of the model directory
-    def test_STN_inpainting(self):
 
-        assert self.test_set is not None
+    def interactive_spectrogram_inpainting(self, audio, fs, mask):
+        #audio: torch.tensor of shape (1, audio_len)
+        #mask: spectral mask
 
+        audio=audio.float().to(self.device)
+        audio=self.resample_audio(audio, fs)
 
-        if len(self.test_set) == 0:
-            print("No samples found in test set")
-        
-        res=torch.zeros((len(self.test_set),self.args.exp.audio_len))
-        #the conditional sampling uses batch_size=1, so we need to loop over the test set. This is done for simplicity, but it is not the most efficient way to do it.
-        from utils.decSTN_pytorch import apply_STN_mask
+        inpainting_mask=mask
 
-        for i, (original, fs, filename) in enumerate(tqdm(self.test_set)):
-            n=os.path.splitext(filename[0])[0]
-            original=original.float().to(self.device)
-            seg=self.resample_audio(original, fs)
-            inpainting_mask=self.prepare_STN_mask(seg)
-            #seg=torchaudio.functional.resample(seg, self.args.exp.resample_factor, 1)
-            utils_logging.write_audio_file(seg, self.args.exp.sample_rate, n, path=self.paths["STN_inpainting"+"original"])
-            masked=apply_STN_mask(seg, inpainting_mask, nWin1=self.args.tester.STN_inpainting.STN_params.nwin1)
+        masked=self.apply_spectral_mask(audio, inpainting_mask)
+        pred=self.sampler.predict_spectrogram_inpainting(masked, inpainting_mask)
 
-            utils_logging.write_audio_file(masked, self.args.exp.sample_rate, n, path=self.paths["STN_inpainting"+"degraded"])
+        return pred
 
-            pred=self.sampler.predict_STN_inpainting(masked, inpainting_mask)
-
-            utils_logging.write_audio_file(pred, self.args.exp.sample_rate, n, path=self.paths["STN_inpainting"+"reconstructed"])
-            res[i,:]=pred
-
-        if self.use_wandb:
-            self.log_audio(res, "spectrogram_inpainting")
-        
-        #TODO save the files in the subdirectory inpainting of the model directory
     def test_inpainting(self):
         if not self.do_inpainting or self.test_set is None:
             print("No test set specified, skipping inpainting test")
