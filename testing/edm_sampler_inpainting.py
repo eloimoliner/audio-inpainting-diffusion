@@ -204,7 +204,6 @@ class Sampler():
             if gamma[i]==0:
                 #deterministic sampling, do nothing
                 t_hat=t[i] 
-                x_hat=x
             else:
                 #stochastic sampling
                 #move timestep
@@ -212,12 +211,13 @@ class Sampler():
                 #sample noise, Snoise is 1 by default
                 epsilon=torch.randn(shape).to(device)*self.diff_params.Snoise
                 #add extra noise
-                x_hat=x+((t_hat**2 - t[i]**2)**(1/2))*epsilon 
+                x=x+((t_hat**2 - t[i]**2)**(1/2))*epsilon  #x_hat
+                del epsilon
 
             if self.rid:
-                rid_xt[i]=x_hat
+                rid_xt[i]=x
 
-            score=self.get_score(x_hat, self.y, t_hat, self.degradation)    
+            score=self.get_score(x, self.y, t_hat, self.degradation)    
             if self.rid:
                 score, x_hat1, grads, x_hat2, x_hat3=score
                 rid_denoised[i]=x_hat1
@@ -237,18 +237,18 @@ class Sampler():
                 #second order correction2
                 #h=t[i+1]-t_hat
                 t_prime=t[i+1]
-                x_prime=x_hat+h*d
+                x_prime=x+h*d
                 score=self.get_score(x_prime, self.y, t_prime, self.degradation)
                 if self.rid:
                     score, x_hat1, grads, x_hat2, x_hat3=score
 
                 d_prime=-t_prime*score
 
-                x=(x_hat+h*((1/2)*d +(1/2)*d_prime))
+                x=(x+h*((1/2)*d +(1/2)*d_prime))
 
             elif t[i+1]==0 or self.order==1: #first condition  is to avoid dividing by 0
                 #first order Euler step
-                x=x_hat+h*d
+                x=x+h*d
 
             if self.rid: 
                 rid_xt2[i]=x
@@ -268,9 +268,7 @@ class Sampler():
 
         return mask*x
 
-    def apply_spectral_mask(self, x, mask=None):
-        if mask is None:
-            mask=self.mask
+    def apply_spectral_mask(self, x):
 
         if self.args.tester.spectrogram_inpainting.stft.window=="hann":
             window=torch.hann_window(self.args.tester.spectrogram_inpainting.stft.win_length).to(x.device)
@@ -281,15 +279,15 @@ class Sampler():
         #add padding to the signal
         input_shape=x.shape
         x=torch.nn.functional.pad(x, (0, n_fft-x.shape[-1]%n_fft), mode='constant', value=0)
-        X=torch.stft(x, n_fft, self.args.tester.spectrogram_inpainting.stft.hop_length, self.args.tester.spectrogram_inpainting.stft.win_length, window, return_complex=True) 
+        x=torch.stft(x, n_fft, self.args.tester.spectrogram_inpainting.stft.hop_length, self.args.tester.spectrogram_inpainting.stft.win_length, window, return_complex=True) 
         #X.shape=(B, F, T)
-        X_masked=X*mask.unsqueeze(0)
+        x=x*self.mask.unsqueeze(0)
         #apply the inverse stft
-        x_masked=torch.istft(X_masked, n_fft, self.args.tester.spectrogram_inpainting.stft.hop_length, self.args.tester.spectrogram_inpainting.stft.win_length, window, return_complex=False)
+        x=torch.istft(x, n_fft, self.args.tester.spectrogram_inpainting.stft.hop_length, self.args.tester.spectrogram_inpainting.stft.win_length, window, return_complex=False)
         #why is the size different? Because of the padding?
-        x_masked=x_masked[...,0:input_shape[-1]]
+        x=x[...,0:input_shape[-1]]
 
-        return x_masked
+        return x
 
 
     #def proj_convex_set(self, x_hat, y, degradation):
@@ -353,31 +351,17 @@ class Sampler():
         mask
         ):
         self.mask=mask.to(y_masked.device)
+        del mask
 
         self.y=y_masked
+        del y_masked
 
         self.degradation=lambda x: self.apply_spectral_mask(x)
         if self.data_consistency or self.data_consistency_end:
-            smooth_mask=mask #I assume for now that the smoothness is not required for spectrogram inpainting
 
-            self.proj_convex_set= lambda x: y_masked+x-self.apply_spectral_mask(x) #If this fails, consider using a more appropiate projection
-
-        return self.predict(self.y.shape, self.y.device)
-
-
-    def predict_STN_inpainting(
-        self,
-        y_masked,
-        mask
-        ):
-        self.mask=mask.to(y_masked.device)
-
-        self.y=y_masked
-
-        self.degradation=lambda x: self.apply_STN_mask(x, self.mask)
-        if self.data_consistency or self.data_consistency_end:
-            smooth_mask=mask #I assume for now that the smoothness is not required for spectrogram inpainting
-
-            self.proj_convex_set= lambda x: y_masked+self.apply_STN_mask(x,1-self.mask) #If this fails, consider using a more appropiate projection
+            self.proj_convex_set= lambda x: self.y+x-self.apply_spectral_mask(x) #If this fails, consider using a more appropiate projection
 
         return self.predict(self.y.shape, self.y.device)
+
+
+
