@@ -339,7 +339,7 @@ class Tester():
         X=20*torch.log10(X+1e-6)
         X=X.detach().cpu().numpy()
         X=X[0]
-        #normalize spectrogram
+        
         return X
 
 
@@ -499,7 +499,7 @@ class Tester():
         audio=audio.float().to(self.device)
         audio=self.resample_audio(audio, fs)
 
-        inpainting_mask=mask
+        inpainting_mask=mask.to(self.device)
 
         masked=self.apply_spectral_mask(audio, inpainting_mask)
         pred=self.sampler.predict_spectrogram_inpainting(masked, inpainting_mask)
