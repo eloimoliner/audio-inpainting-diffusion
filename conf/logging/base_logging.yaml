@@ -1,0 +1,36 @@
+
+#logging params
+log: True
+log_interval: 1000
+heavy_log_interval: 50000 #same as save_interval
+save_model: True
+save_interval: 50000
+
+
+#about special logs
+num_sigma_bins: 20
+freq_cqt_logging: 100
+
+
+print_model_summary: True
+
+profiling:
+  enabled: True
+  wait: 5
+  warmup: 10
+  active: 2
+  repeat: 1
+
+#stft
+stft:
+  win_size: 1024
+  hop_size: 256
+
+cqt:
+  hop_length: 1024
+  num_octs: 6
+  fmin: 70
+  bins_per_oct: 1
+
+log_feature_stats: True
+log_feature_stats_interval: 50000

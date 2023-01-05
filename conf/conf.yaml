@@ -1,0 +1,25 @@
+defaults:
+  - dset: maestro_little
+  - network: unet_cqtdiff
+  - diff_params: edm
+  - tester: edm_2ndorder_stochastic
+  - exp: test_cqtdiff_matrix_22k
+  - logging: base_logging
+
+model_dir: "experiments/cqt"
+
+dry_run: False #', help='Print training options and exit',                            is_flag=True)
+
+#testing (demos)
+
+
+hydra:
+  job:
+    config:
+      # configuration for the ${hydra.job.override_dirname} runtime variable
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        # Remove all paths, as the / in them would mess up things
+        exclude_keys: ['path_experiment',
+          'hydra.job_logging.handles.file.filename']

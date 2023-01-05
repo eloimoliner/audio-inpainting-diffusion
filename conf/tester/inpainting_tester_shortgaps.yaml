@@ -1,0 +1,106 @@
+do_test: True #boolean flag to run inference, False means no testing at all
+
+name: "inpainting_tester" #same as the file name, try to do that for all testers
+
+callable: 'testing.tester_inpainting.Tester'
+sampler_callable: 'testing.edm_sampler_inpainting.Sampler'
+
+#modes: ['unconditional', 'inpainting'] #modes to test
+
+#modes:  ['inpainting'] #basic time-domain inpainting, using the mask parameters specified in the inpainting section
+
+#modes:  ['inpainting_fordamushra'] # mode to prepare the data for the long-gap MUSHRA test (fixed hard-coded gap lengths). Also, hard-coded paths
+
+modes:  ['inpainting_shortgaps'] #modes to prepare the data of the short-gap MUSHRA test. Requires a dedicated data_loader ("inpainting_musicnet.yaml"). Loads the mask from the data_loader, from some .mat files
+
+#modes:  ['spectrogram_inpainting'] #experimenting with spectrogram inpainting. THe mask parameters are specified in the spectrogram_inpainting section
+#
+#modes:  ['STN_inpainting'] #experimenting with spectrogram inpainting. THe mask parameters are specified in the spectrogram_inpainting section
+
+T: 70 #number of discretizatio steprs
+order: 2 #order of the discretization TODO: implement higher order samplers as the one used in ediffi
+
+filter_out_cqt_DC_Nyq: True
+
+checkpoint: "experiments/54/22k_8s-790000.pt"
+
+unconditional:
+  num_samples: 4
+  audio_len: 184184
+
+posterior_sampling:
+  xi: 0.25 #restoration guidance, 0 means no guidance
+  norm: 2 #1 or 2 or "smoothl1"
+  smoothl1_beta: 1
+
+data_consistency:
+  use: True
+  type: "always" # or "end" or "end_smooth"
+  smooth: True  #apply a smoother mask for data consistency steps
+  hann_size: 100 #in samples
+  
+  
+
+#new diffusion parameters (only for sampling):
+diff_params:
+  same_as_training: False
+  sigma_data: 0.063 #default for maestro
+  sigma_min: 1e-4
+  sigma_max: 1
+  P_mean: -1.2 #what is this for?
+  P_std: 1.2 #ehat is this for?
+  ro: 13
+  ro_train: 13
+  Schurn: 10
+  Snoise: 1.000
+  Stmin: 0
+  Stmax: 50
+
+
+autoregressive:
+  overlap: 0.25
+  num_samples: 4
+
+sampler: "stochastic" #wether deterministic or stochastic, unused as Scurn defineds the stochasticity
+
+noise_in_observations_SNR: None
+
+inpainting:
+  mask_mode: "long" #or "short"
+  long:
+    gap_length: 1500 #in ms
+    start_gap_idx: None #in ms, None means at the middle
+  short:
+    num_gaps: 4
+    gap_length: 25 #in ms
+    start_gap_idx: None #in ms, None means random. If not None this should be a list of length num_gaps
+
+spectrogram_inpainting: #specifies a (rectangular for now) mask localized in time and frequency
+  stft:
+    window: "hann"
+    n_fft: 1024
+    hop_length: 256
+    win_length: 1024
+  time_mask_length: 2000 #in ms
+  time_start_idx: None #in ms, None means at the middle
+  min_masked_freq: 300 #in Hz (lowest frequency to mask)
+  max_masked_freq: 2000 #in Hz (max frequency to mask)
+  
+STN_inpainting:  #TODO implement STN inpainting
+  STN_params:
+    nwin1: 4096
+    G1: 0.65
+    G2: 0.7
+  type: "TN" #or "S" or "T" or "N"
+  
+
+
+
+comp_sens: 
+  percentage: 5 #%
+
+
+max_thresh_grads: 1
+type_spec: "linear" #or "mel" for phase retrieval
+declipping:
+  SDR: 3 #in dB

@@ -1,0 +1,36 @@
+
+#logging params
+log: True
+log_interval: 50
+heavy_log_interval: 100 #same as save_interval
+save_model: True
+save_interval: 100 #hihly recommended to be the same as heavy_log_interval, or at least a multiple of it
+
+remove_last_checkpoint: True
+#about special logs
+num_sigma_bins: 20
+freq_cqt_logging: 1
+
+
+print_model_summary: True
+
+profiling:
+  enabled: False
+  wait: 10
+  warmup: 100
+  active: 2
+  repeat: 1
+
+#stft
+stft:
+  win_size: 1024
+  hop_size: 256
+
+cqt:
+  hop_length: 1024
+  num_octs: 8
+  fmin: 32.70
+  bins_per_oct: 1
+
+log_feature_stats: False
+log_feature_stats_interval: 20000000

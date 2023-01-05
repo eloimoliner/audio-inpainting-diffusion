@@ -1,0 +1,18 @@
+#network from the paper: Solving audio inverse problems with a diffusion model
+name: "unet_cqtdiff_original"
+callable: "networks.CQTdiff_original.unet_cqt_fast.Unet_CQT"
+
+
+use_fencoding: True
+use_norm: False
+
+filter_out_cqt_DC_Nyq: True
+
+depth: 6 #it is hardcoded
+Ns: [32, 64,64,128, 128, 128, 128, 128] #it is hardcoded
+Ss: [2,2,2,2,2,2] #it is hardcoded
+
+cqt:
+    num_octs: 7
+    bins_per_oct: 64
+

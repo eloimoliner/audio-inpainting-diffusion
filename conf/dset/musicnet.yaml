@@ -1,0 +1,15 @@
+name: "musicnet"
+type: "audio"
+callable: "datasets.audiofolder.AudioFolderDataset"
+#path: "/u/25/molinee2/unix/datasets/MusicNet/train"
+path: "/scratch/work/molinee2/datasets/musicnet/train_data"
+
+overfit: False
+      
+test:
+   callable: "datasets.audiofolder_test.AudioFolderDatasetTest"
+   #path: "/u/25/molinee2/unix/datasets/MusicNet/train"
+   path: "/scratch/work/molinee2/datasets/musicnet/test_data"
+   num_samples: 4
+   batch_size: 1
+

@@ -1,0 +1,16 @@
+name: "maestro_allyears"
+callable: "datasets.maestro_dataset.MaestroDataset_fs"
+type: "audio"
+path: "/scratch/shareddata/dldata/maestro/v3.0.0/maestro-v3.0.0"
+#years: [2004,2006,2008,2009,2011, 2013, 2014, 2015, 2017, 2018] # I will use only these years as the most recent ones are sampled at 48kHz
+years: [ 2015, 2017, 2018] # I will use only these years as the most recent ones are sampled at 48kHz
+years_test: [  2009] #less years to make it quicker to compute, otherwise sampling is crazy long.
+cache: True #',         help='Cache dataset in CPU memory', metavar='BOOL',                type=bool, default=True, show_default=True)
+      
+
+load_len: 405000
+
+test:
+  callable: "datasets.maestro_dataset_test.MaestroDatasetTestChunks"
+  num_samples: 4
+  batch_size: 1

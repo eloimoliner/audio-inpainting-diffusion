@@ -1,0 +1,90 @@
+exp_name: "44k_8s"
+
+trainer_callable: "training.trainer.Trainer"
+
+wandb:
+  entity: "eloimoliner"
+  project: "A-diffusion"
+
+model_dir: None
+#main options
+#related to optimization
+optimizer:
+  type: "adam" #only "adam implemented
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1e-8 #for numerical stability, we may need to modify it if usinf fp16
+  
+lr: 2e-4 #            help='Learning rate',
+lr_rampup_it: 10000 #,  help='Learning rate rampup duration'
+
+#for lr scheduler (not noise schedule!!) TODO (I think)
+scheduler_step_size: 60000
+scheduler_gamma: 0.8
+
+
+#save_model: True #wether to save the checkpoints of the model in this experiment
+
+ 
+# Training related.
+#total_its: 100000  #help='Training duration'
+batch: 4 #         help='Total batch size'
+batch_gpu: 4 #,     help='Limit batch size per GPU'
+num_accumulation_rounds: 1 #gradient accumulation, truncated backprop
+
+
+# Performance-related.
+use_fp16: False #',          help='Enable mixed-precision training', metavar='BOOL',            type=bool, default=False, show_default=True)
+ls: 1 #',            help='Loss scaling', metavar='FLOAT',                              type=click.FloatRange(min=0, min_open=True), default=1, show_default=True)
+bench: True #',         help='Enable cuDNN benchmarking', metavar='BOOL',                  type=bool, default=True, show_default=True)
+num_workers: 4  #',       help='DataLoader worker processes', metavar='INT',                 type=click.IntRange(min=1), default=1, show_default=True)
+
+# I/O-related. moved to logging
+seed: 42 #',          help='Random seed  [default: random]', metavar='INT',              type=int)
+transfer: None #',      help='Transfer learning from network pickle', metavar='PKL|URL',   type=str)
+#resume: True #',        help='Resume from previous training state', metavar='PT',          type=str)
+resume: True
+resume_checkpoint: None
+
+
+#audio data related
+sample_rate: 44100
+audio_len: 368368
+resample_factor: 1 #useful for the maestro dataset, which is sampled at  44.1kHz or 48kHz and we want to resample it to 22.05kHz
+
+
+#training functionality parameters
+device: "cpu" #it will be updated in the code, no worries
+
+#training
+use_cqt_DC_correction: False #if True, the loss will be corrected for the DC component and the nyquist frequency. This is important because we are discarding the DC component and the nyquist frequency in the cqt
+
+#ema_rate: "0.9999"  # comma-separated list of EMA values
+ema_rate: 0.9999  #unused
+ema_rampup: 10000  #linear rampup to ema_rate   #help='EMA half-life' 
+
+
+#gradient clipping
+use_grad_clip: True
+max_grad_norm: 1
+
+restore : False
+checkpoint_id: None
+
+#pre-emph. This should not go here! either logging or network
+
+#augmentation related
+augmentations:
+  rev_polarity: True
+  pitch_shift:
+    use: False
+    min_semitones: -6
+    max_semitones: 6
+  gain:
+    use: False
+    min_db: -3
+    max_db: 3
+
+
+
+

@@ -1,0 +1,17 @@
+name: "musicnet"
+type: "audio"
+callable: "datasets.librispeech.LibrispeechTrain"
+#path: "/u/25/molinee2/unix/datasets/MusicNet/train"
+path: "/scratch/work/molinee2/datasets/LibriSpeech"
+
+train_dirs: ["train_clean-100", "train-clean-360"]
+
+overfit: False
+      
+test:
+   callable: "datasets.librispeech.LibrispeechTest"
+   #path: "/u/25/molinee2/unix/datasets/MusicNet/train"
+   path: "/scratch/work/molinee2/datasets/LibriSpeech/dev-clean"
+   num_samples: 4
+   batch_size: 1
+

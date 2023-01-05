@@ -1,0 +1,23 @@
+#add all the parameters of the layers you want to use in 1d U-Net
+name: "ADP_raw_patching"
+callable: "networks.flavio_models.modules.UNet1d"
+
+use_cqt_DC_correction: False
+
+channels: 128
+patch_factor: 16
+patch_blocks: 1
+resnet_groups: 8
+kernel_multiplier_downsample: 2
+multipliers: [1, 2, 4, 4, 4, 4, 4]
+factors: [2, 2, 2, 2, 2, 2]
+num_blocks: [2, 2, 2, 2, 2, 2]
+attentions: [0, 0, 0, 0, 1, 1, 1]
+attention:
+  attention_heads: 16
+  attention_features: 64
+  attention_multiplier: 4
+  attention_use_rel_pos: False
+use_nearest_upsample: False
+use_skip_scale: True
+use_context_time: True
