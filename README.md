@@ -1,1 +1,1 @@
-# audio-inpainting-diffusion
+# Diffusion-Based Audio Inpainting
