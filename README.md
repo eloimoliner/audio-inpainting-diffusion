@@ -5,3 +5,4 @@ Official repository of the paper:
 
 Audio examples available at the [companion website](http://research.spa.aalto.fi/publications/papers/jaes-diffusion-inpainting/)
 
+Trained models available at [HuggingFace](https://huggingface.co/Eloimoliner/audio-inpainting-diffusion)
