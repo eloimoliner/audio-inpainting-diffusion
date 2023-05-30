@@ -1,13 +1,3 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-# This work is licensed under a Creative Commons
-# Attribution-NonCommercial-ShareAlike 4.0 International License.
-# You should have received a copy of the license along with this
-# work. If not, see http://creativecommons.org/licenses/by-nc-sa/4.0/
-
-"""Train diffusion-based generative model using the techniques described in the
-paper "Elucidating the Design Space of Diffusion-Based Generative Models"."""
-
 import os
 import re
 import json
@@ -22,11 +12,6 @@ from training.trainer import Trainer
 import warnings
 warnings.filterwarnings('ignore', 'Grad strides do not match bucket view strides') # False warning printed by PyTorch 1.12.
 
-#import wandb
-
-#----------------------------------------------------------------------------
-# Parse a comma separated list of numbers or ranges and return a list of ints.
-# Example: '1,2,5-10' returns [1, 2, 5, 6, 7, 8, 9, 10]
 
 def parse_int_list(s):
     if isinstance(s, list): return s
@@ -44,16 +29,6 @@ def parse_int_list(s):
 
 
 def _main(args):
-    """Train diffusion-based generative model using the techniques described in the
-    paper "Elucidating the Design Space of Diffusion-Based Generative Models".
-
-    Examples:
-
-    \b
-    # Train DDPM++ model for class-conditional CIFAR-10 using 8 GPUs
-    torchrun --standalone --nproc_per_node=8 train.py --outdir=training-runs \\
-        --data=datasets/cifar10-32x32.zip --cond=1 --arch=ddpmpp
-    """
 
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #assert torch.cuda.is_available()

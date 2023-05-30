@@ -11,11 +11,6 @@ import utils.setup as setup
 import warnings
 warnings.filterwarnings('ignore', 'Grad strides do not match bucket view strides') # False warning printed by PyTorch 1.12.
 
-#import wandb
-
-#----------------------------------------------------------------------------
-# Parse a comma separated list of numbers or ranges and return a list of ints.
-# Example: '1,2,5-10' returns [1, 2, 5, 6, 7, 8, 9, 10]
 
 def parse_int_list(s):
     if isinstance(s, list): return s
@@ -36,8 +31,6 @@ def _main(args):
 
 
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #assert torch.cuda.is_available()
-    #device="cuda"
 
     global __file__
     __file__ = hydra.utils.to_absolute_path(__file__)
@@ -47,23 +40,16 @@ def _main(args):
         print(args.model_dir)
         if not os.path.exists(args.model_dir):
             raise Exception(f"Model directory {args.model_dir} does not exist")
-            #os.makedirs(args.model_dir)
 
     args.exp.model_dir=args.model_dir
 
-
-    #opts = dnnlib.EasyDict(kwargs)
     torch.multiprocessing.set_start_method('spawn')
 
-    #dist.init()
-    #dset=setup.setup_dataset(args)
     diff_params=setup.setup_diff_parameters(args)
     network=setup.setup_network(args, device)
-    #tester=setup.setup_tester(args, network, diff_params, device) #this will be used for making demos during training
 
     test_set=setup.setup_dataset_test(args)
 
- 
     tester=setup.setup_tester(args, network=network, diff_params=diff_params, test_set=test_set, device=device) #this will be used for making demos during training
     # Print options.
     dist.print0()
@@ -95,4 +81,3 @@ def main(args):
 if __name__ == "__main__":
     main()
 
-#----------------------------------------------------------------------------

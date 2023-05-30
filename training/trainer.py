@@ -41,8 +41,6 @@ class Trainer():
         else:
             self.do_test=True
 
-        #these are settings set by karras. I am not sure what they do
-        #np.random.seed((seed * dist.get_world_size() + dist.get_rank()) % (1 << 31))
         torch.manual_seed(np.random.randint(1 << 31))
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.benchmark = True
@@ -83,7 +81,6 @@ class Trainer():
 
         
         if self.args.logging.log:
-            #assert self.args.logging.heavy_log_interval % self.args.logging.save_interval == 0 #sorry for that, I just want to make sure that you are not wasting your time by logging too often, as the tester is only updated with the ema weights from a checkpoint
             self.setup_wandb()
             if self.do_test:
                self.tester.setup_wandb_run(self.wandb_run)
@@ -362,8 +359,6 @@ class Trainer():
     def training_loop(self):
         
         # Initialize.
-
-        #ddp = torch.nn.parallel.DistributedDataParallel(net, device_ids=[device], broadcast_buffers=False)
 
         while True:
             # Accumulate gradients.
